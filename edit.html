@@ -1,0 +1,172 @@
+<?php
+require_once __DIR__ . "/../../config/db.php";
+require_once __DIR__ . "/../../config/auth.php";
+
+/* Hide search bar */
+$hideSearch = true;
+require_once __DIR__ . "/../../partials/header.php";
+
+/* Current user */
+$userId = $_SESSION['user']['id'];
+
+/* Load user data (UPDATED) */
+$stmt = $pdo->prepare("
+  SELECT id, full_name, email, phone, address, role 
+  FROM users 
+  WHERE id = ?
+");
+$stmt->execute([$userId]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+/* Messages */
+$profileSuccess = '';
+$passwordError = '';
+$passwordSuccess = '';
+
+/* ==========================
+   UPDATE PROFILE INFO
+   ========================== */
+if (isset($_POST['update_profile'])) {
+
+  $full_name = trim($_POST['full_name']);
+  $phone     = trim($_POST['phone']);
+  $address   = trim($_POST['address']);
+
+  if ($full_name === '' || $phone === '' || $address === '') {
+    $profileError = "All profile fields are required.";
+  } else {
+    $pdo->prepare("
+      UPDATE users 
+      SET full_name = ?, phone = ?, address = ?
+      WHERE id = ?
+    ")->execute([$full_name, $phone, $address, $userId]);
+
+    $user['full_name'] = $full_name;
+    $user['phone'] = $phone;
+    $user['address'] = $address;
+
+    $profileSuccess = "Profile updated successfully.";
+  }
+}
+
+/* ==========================
+   UPDATE PASSWORD
+   ========================== */
+if (isset($_POST['update_password'])) {
+
+  $currentPassword = $_POST['current_password'] ?? '';
+  $newPassword     = $_POST['new_password'] ?? '';
+
+  $stmt = $pdo->prepare("SELECT password_hash FROM users WHERE id=?");
+  $stmt->execute([$userId]);
+  $dbPassword = $stmt->fetchColumn();
+
+  if (!password_verify($currentPassword, $dbPassword)) {
+    $passwordError = "Current password is incorrect.";
+  } elseif (strlen($newPassword) < 6) {
+    $passwordError = "New password must be at least 6 characters.";
+  } else {
+    $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+    $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")
+        ->execute([$newHash, $userId]);
+    $passwordSuccess = "Password updated successfully.";
+  }
+}
+?>
+
+<link rel="stylesheet" href="../../assets/admin.css">
+
+<div class="admin-layout">
+
+    <?php require_once __DIR__ . "/admin_sidebar.php"; ?>
+
+    <main class="admin-content">
+
+        <div class="profile-wrapper">
+            <div class="profile-card">
+
+                <!-- PROFILE HEADER -->
+                <div class="profile-header">
+                    <div class="profile-avatar">
+                        <?= strtoupper(substr($user['full_name'], 0, 1)) ?>
+                    </div>
+                    <div>
+                        <h2>
+                            <?= htmlspecialchars($user['full_name']) ?>
+                        </h2>
+                        <span>
+                            <?= htmlspecialchars($user['email']) ?>
+                        </span>
+
+                        <div class="profile-role">
+                            <?php if ($user['role'] === 'ADMIN'): ?>
+                            <span class="role admin">👑 Admin</span>
+                            <?php else: ?>
+                            <span class="role user">👤 Customer</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UPDATE PROFILE -->
+                <h3>Profile Information</h3>
+
+                <?php if (!empty($profileError)): ?>
+                <p class="error">
+                    <?= $profileError ?>
+                </p>
+                <?php endif; ?>
+
+                <?php if ($profileSuccess): ?>
+                <p class="success">
+                    <?= $profileSuccess ?>
+                </p>
+                <?php endif; ?>
+
+                <form method="post" class="profile-form">
+                    <label>Full Name</label>
+                    <input name="full_name" value="<?= htmlspecialchars($user['full_name']) ?>" required>
+
+                    <label>Phone Number</label>
+                    <input name="phone" value="<?= htmlspecialchars($user['phone']) ?>" required>
+
+                    <label>Address</label>
+                    <input name="address" value="<?= htmlspecialchars($user['address']) ?>" required>
+
+                    <button name="update_profile">Save Profile</button>
+                </form>
+
+                <hr>
+
+                <!-- CHANGE PASSWORD -->
+                <h3>Change Password</h3>
+
+                <?php if ($passwordError): ?>
+                <p class="error">
+                    <?= $passwordError ?>
+                </p>
+                <?php endif; ?>
+
+                <?php if ($passwordSuccess): ?>
+                <p class="success">
+                    <?= $passwordSuccess ?>
+                </p>
+                <?php endif; ?>
+
+                <form method="post" class="profile-form">
+                    <label>Current Password</label>
+                    <input type="password" name="current_password" required>
+
+                    <label>New Password</label>
+                    <input type="password" name="new_password" required>
+
+                    <button name="update_password">Update Password</button>
+                </form>
+
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<?php require_once __DIR__ . "/../../partials/footer.php"; ?>

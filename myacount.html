@@ -1,0 +1,104 @@
+<?php
+session_start();
+
+$conn = new mysqli("localhost", "root", "", "login");
+if ($conn->connect_error) {
+    die("Connection failed");
+}
+
+$user_id = 1; // بۆ نموونە (دواتر دەتوانی بکەیت بە $_SESSION['id'])
+
+if (isset($_POST['update'])) {
+
+    $username = $_POST['username'];
+    $email = $_POST['email'];
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+    $imageName = $_FILES['image']['name'];
+    if ($imageName != "") {
+        move_uploaded_file($_FILES['image']['tmp_name'], "uploads/" . $imageName);
+        $conn->query("UPDATE users SET 
+            username='$username',
+            email='$email',
+            password='$password',
+            image='$imageName'
+            WHERE id=$user_id");
+    } else {
+        $conn->query("UPDATE users SET 
+            username='$username',
+            email='$email',
+            password='$password'
+            WHERE id=$user_id");
+    }
+
+    header("Location: profile.php");
+    exit();
+}
+
+$result = $conn->query("SELECT * FROM users WHERE id=$user_id");
+$user = $result->fetch_assoc();
+?>
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Profile Settings</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f4f4;
+        }
+
+        .box {
+            background: #fff;
+            max-width: 400px;
+            margin: 40px auto;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        input,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+        }
+
+        img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
+            margin: 10px auto;
+        }
+
+        button {
+            background: #007bff;
+            color: #fff;
+            border: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="box">
+        <h2 style="text-align:center">Edit Profile</h2>
+
+        <img src="uploads/<?php echo $user['image']; ?>">
+
+        <form method="POST" enctype="multipart/form-data">
+            <input type="text" name="username" value="<?php echo $user['username']; ?>" required>
+            <input type="email" name="email" value="<?php echo $user['email']; ?>" required>
+            <input type="password" name="password" placeholder="New Password" required>
+            <input type="file" name="image">
+            <button type="submit" name="update">Update</button>
+        </form>
+    </div>
+
+</body>
+
+</html>
